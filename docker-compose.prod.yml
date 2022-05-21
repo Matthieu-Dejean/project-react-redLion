@@ -1,0 +1,53 @@
+# docker-compose.yml
+version: "3.4"
+# Docker-compose que l'on utilise sur le serveur en Prod !
+
+services:
+  back:
+    # On ne build pas ici, on utilise directement l'image sur Docker Hub
+    image: alexisvib/staging-server-redlion
+    depends_on:
+      - database
+    expose:
+      - 3004
+      # On n'indique plus de volumes, car ici on ne se synchronise
+      # pas avec des dossiers du repertoire courant
+      # ou pas d'interet à partager des fichiers avec d'autres conteneurs
+    environment:
+      - DATABASE_URL=postgres://postgres:root@database:5432/postgres
+
+  database:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: root
+    volumes:
+      - database-volume:/var/lib/postgresql/data
+
+  front:
+    # On ne build pas ici, on utilise directement l'image sur Docker Hub
+    image: alexisvib/staging-client-redlion
+    # Il n'y a plus de serveur en front
+    # On fait tourner npm run build
+    # Le dossier /build ne contient QUE des fichiers statiques
+    # Il n'y a donc plus besoin d'indiquer de port
+    # Il faut juste rendre accessible le dossier /app/build du conteneur à nginx
+    volumes:
+      - web-client-build:/app/build
+
+  nginx:
+    image: nginx:1.21.3
+    depends_on:
+      - back
+      - front
+    restart: always
+    ports:
+      - ${GATEWAY_PORT:-8000}:80
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./logs:/var/log/nginx
+      - web-client-build:/web-client-build
+
+# Volume persisté et mis en dehors du repertoire courant dans les dossiers de docker
+volumes:
+  database-volume:
+  web-client-build:
